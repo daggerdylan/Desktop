@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>Gemini Dashboard V12 (Stable)</title>
+    <title>Gemini Dashboard V13 (Debug Mode)</title>
     <style>
         /* --- RESET --- */
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
@@ -50,7 +50,7 @@
         .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
         .msg.user { align-self: flex-end; background: #87CEEB; color: #111; font-weight: 600; }
         .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
-        .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.8rem; }
+        .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.75rem; }
         .msg.system { align-self: center; color: #aaa; font-size: 0.75rem; font-style: italic; }
 
         .chat-input-area { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
@@ -77,7 +77,6 @@
         input[type="text"], input[type="password"] { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; }
         .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
         
-        /* RESTORED TOGGLES */
         .toggles { display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 0 20px; border-radius: 12px; min-height: 45px; }
         .toggle-label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
         input[type="checkbox"] { accent-color: #fd5e53; transform: scale(1.1); }
@@ -111,7 +110,7 @@
     <div id="ai-container">
         <div id="chat-window">
             <div class="chat-header">
-                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">AUTO</span></div>
+                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">DEBUG</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
             </div>
             <div id="chat-history"></div>
@@ -130,7 +129,6 @@
             <div>
                 <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">GEMINI API KEY</label>
                 <input type="password" id="gemini-key" placeholder="Paste Key..." style="width: 100%; margin-top:5px;" onchange="saveSettings()">
-                <div style="font-size:0.75rem; color:#aaa; margin-top:5px;">Your key is saved locally. If "1.5 Flash" fails, I will auto-switch to "Pro".</div>
             </div>
 
             <!-- WALLHAVEN -->
@@ -141,7 +139,6 @@
                     <button class="btn" onclick="searchWallhaven()">Search</button>
                 </div>
                 
-                <!-- RESTORED TOGGLES -->
                 <div class="toggles" style="margin-top: 10px;">
                     <label class="toggle-label"><input type="checkbox" id="chk-sfw" checked> SFW</label>
                     <label class="toggle-label" style="color: #ffd700;"><input type="checkbox" id="chk-sketchy"> Sketchy</label>
@@ -163,7 +160,6 @@
 
     <script>
         // --- CONFIG ---
-        // DO NOT PASTE KEYS HERE FOR GITHUB UPLOAD. LEAVE EMPTY.
         const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9'; 
         const LAT = 40.7128; 
         const LON = -74.0060; 
@@ -183,13 +179,13 @@
             
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "System Online.");
+            else addMsg("system", "Debug Mode Online.");
 
             updateTime();
             fetchWeather();
         };
 
-        // --- GEMINI LOGIC (With Auto-Fallback) ---
+        // --- LOGIC ---
         function saveSettings() { localStorage.setItem('gemini_key', keyInput.value); }
         function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
         function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
@@ -219,17 +215,29 @@
             chatHistory.appendChild(loadingDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
+            // Debug logic: Capture actual error message
+            let lastError = "";
+
             // TRY MODEL 1: FLASH
             try {
                 await callGemini("gemini-1.5-flash", apiKey, text);
             } catch (e) {
-                console.warn("Flash failed, trying Pro...");
+                lastError = `1.5 Flash: ${e.message}`;
+                console.warn("Flash failed:", e);
+                
                 // TRY MODEL 2: PRO (Fallback)
                 try {
-                    await callGemini("gemini-pro", apiKey, text);
+                    await callGemini("gemini-1.0-pro", apiKey, text);
                 } catch (e2) {
                     if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                    addMsg("error", "Failed. Check Internet or API Key.");
+                    
+                    // IF NETWORK ERROR
+                    if(e2.message.includes("Failed to fetch")) {
+                        addMsg("error", "NETWORK ERROR: The Linux plugin blocked the connection. <br>Solution: Host this on GitHub Pages.");
+                    } else {
+                        // IF API ERROR
+                        addMsg("error", `ALL MODELS FAILED.<br>1. ${lastError}<br>2. Pro: ${e2.message}`);
+                    }
                 }
             }
         }
@@ -248,25 +256,21 @@
             const data = await res.json();
             
             if(data.error) {
-                // Throw error so the Catch block above triggers the fallback
-                throw new Error(data.error.message);
+                // If the key is bad or model not found, throw actual error
+                throw new Error(`${data.error.code} - ${data.error.message}`);
             } else {
                 if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
                 addMsg("ai", data.candidates[0].content.parts[0].text);
-                
-                // Update Badge to show which model actually worked
                 modelDisplay.innerText = model.toUpperCase().replace("GEMINI-", "");
             }
         }
 
-        // --- WALLHAVEN LOGIC (With Proxy & Toggles) ---
+        // --- WALLHAVEN ---
         function toggleModal() { document.getElementById('modal-overlay').classList.toggle('active'); }
-
         function getPurity() {
             const sfw = document.getElementById('chk-sfw').checked ? '1' : '0';
             const sketchy = document.getElementById('chk-sketchy').checked ? '1' : '0';
             const nsfw = document.getElementById('chk-nsfw').checked ? '1' : '0';
-            // Default to SFW if user is dumb and unchecks everything
             return (sfw+sketchy+nsfw === '000') ? '100' : (sfw+sketchy+nsfw);
         }
 
@@ -279,8 +283,7 @@
             try {
                 const seed = Math.floor(Math.random() * 999999);
                 const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
-                
-                // Using AllOrigins Proxy (Works best for Linux)
+                // Use AllOrigins Proxy
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
                 
                 const res = await fetch(proxyUrl);
@@ -299,7 +302,7 @@
                     resultsGrid.innerHTML = 'No results found.';
                 }
             } catch (e) {
-                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Blocked.<br><small>If on Linux, verify plugin network settings.</small></div>`;
+                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Error.<br>Plugin is blocking connection.</div>`;
             }
         }
 
@@ -323,8 +326,7 @@
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`, { referrerPolicy: 'no-referrer' });
                 const data = await res.json();
                 document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°C`;
-                document.getElementById('condition').innerText = "Active"; 
-            } catch (e) { console.log("Weather failed"); }
+            } catch (e) {}
         }
     </script>
 </body>
