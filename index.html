@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>Dashboard V18 (Rice God)</title>
+    <title>Dashboard V19 (Free Move)</title>
     <style>
         /* --- VARIABLES --- */
         :root {
-            --accent: #87CEEB; /* Default Blue */
+            --accent: #87CEEB;
             --bg-glass: rgba(20, 20, 20, 0.85);
             --border: rgba(255, 255, 255, 0.15);
         }
@@ -31,95 +31,74 @@
         #bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; transition: opacity 0.5s; }
         #vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%); z-index: 1; pointer-events: none; }
 
-        /* --- WIDGET GRID (Right) --- */
-        #widget-container { 
-            position: absolute; top: 50%; right: 40px; transform: translateY(-50%); 
-            width: 350px; display: flex; flex-direction: column; gap: 20px; z-index: 10; 
+        /* --- DESKTOP AREA --- */
+        #desktop {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none; /* Allow clicks to pass through empty space */
         }
 
-        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-
-        /* --- AI CHAT (Left) --- */
-        #ai-container { position: absolute; bottom: 100px; left: 40px; width: 400px; height: 500px; z-index: 10; }
-
-        /* --- DOCK (Bottom) --- */
-        #dock-container {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 10px 20px;
-            border-radius: 20px;
-            display: flex; gap: 15px;
-            z-index: 20;
-            transition: transform 0.2s;
-        }
-        #dock-container:hover { transform: translateX(-50%) scale(1.05); }
-        
-        .dock-icon {
-            width: 40px; height: 40px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-            color: white; text-decoration: none;
-        }
-        .dock-icon:hover { background: var(--accent); color: black; transform: translateY(-5px); box-shadow: 0 5px 15px var(--accent); }
-
-        /* --- CHAT STYLES --- */
-        #chat-window {
-            width: 100%; height: 100%;
+        /* --- WIDGET COMMON STYLES --- */
+        .widget {
+            position: absolute;
             background: var(--bg-glass);
             border: 1px solid var(--border);
             border-radius: 24px;
-            display: flex; flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            padding: 20px;
+            backdrop-filter: blur(15px);
+            display: flex; flex-direction: column; justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: auto; /* Re-enable clicks on widgets */
+            transition: border-color 0.2s, transform 0.1s, box-shadow 0.2s;
         }
 
-        .chat-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.9rem; font-weight: bold; opacity: 0.9;
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(255,255,255,0.03);
+        /* Edit Mode Styles */
+        body.edit-mode .widget {
+            border: 2px dashed var(--accent);
+            cursor: grab;
+            animation: breathe 2s infinite;
         }
+        body.edit-mode .widget:active { cursor: grabbing; transform: scale(1.02); }
+        @keyframes breathe { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.1); } 50% { box-shadow: 0 0 20px 0 rgba(255,255,255,0.2); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.1); } }
 
-        #chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        /* --- SPECIFIC WIDGETS --- */
         
-        .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
-        .msg.user { align-self: flex-end; background: var(--accent); color: #000; font-weight: 600; }
-        .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
-        .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.75rem; }
+        /* Time: Default Top Right */
+        #w-time { top: 50px; right: 50px; width: 300px; height: 150px; align-items: flex-start; }
+        #clock { font-size: 3.5rem; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--accent); }
+        #date { font-size: 1.1rem; opacity: 0.7; margin-top: 5px; }
 
+        /* Weather: Default Below Time */
+        #w-weather { top: 220px; right: 210px; width: 140px; height: 140px; align-items: center; text-align: center; }
+        #temp { font-size: 2.2rem; font-weight: 600; }
+
+        /* Settings: Default Right of Weather */
+        #w-settings { top: 220px; right: 50px; width: 140px; height: 140px; align-items: center; cursor: pointer; text-align: center; }
+        #gear-icon { font-size: 2rem; margin-bottom: 5px; transition: transform 0.5s; }
+        #w-settings:hover #gear-icon { transform: rotate(90deg); color: var(--accent); }
+
+        /* To-Do: Default Below Weather */
+        #w-todo { top: 380px; right: 50px; width: 300px; height: 250px; justify-content: flex-start; }
+        #todo-header { font-size: 0.8rem; font-weight: bold; color: var(--accent); margin-bottom: 10px; display: flex; justify-content: space-between; }
+        #todo-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
+        .todo-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; opacity: 0.8; }
+        .todo-item.done { text-decoration: line-through; opacity: 0.4; }
+        .todo-input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.2); color: white; width: 100%; padding: 5px; margin-top: 5px; font-size: 0.8rem; }
+        .todo-input:focus { border-color: var(--accent); }
+
+        /* Chat: Default Bottom Left */
+        #w-chat { bottom: 50px; left: 50px; width: 400px; height: 500px; padding: 0; overflow: hidden; }
+        .chat-header { padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem; font-weight: bold; opacity: 0.9; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); }
+        #chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .chat-input-area { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
         #chat-input { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 15px; color: white; }
         #chat-input:focus { border-color: var(--accent); }
         #send-btn { background: white; color: black; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-weight: bold; }
         #send-btn:hover { background: var(--accent); }
 
-        /* --- CARDS --- */
-        .card { background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; justify-content: center; backdrop-filter: blur(10px); }
-        
-        #widget-time { align-items: flex-start; }
-        #clock { font-size: 3.5rem; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--accent); filter: brightness(1.2); }
-        #date { font-size: 1.1rem; opacity: 0.7; margin-top: 5px; }
-        #widget-weather { aspect-ratio: 1/1; }
-        #temp { font-size: 2.2rem; font-weight: 600; }
-        #widget-settings { aspect-ratio: 1/1; align-items: center; cursor: pointer; text-align: center; }
-        #gear-icon { font-size: 2rem; margin-bottom: 5px; transition: transform 0.5s; }
-        #widget-settings:hover #gear-icon { transform: rotate(90deg); color: var(--accent); }
-
-        /* --- TO-DO LIST --- */
-        #widget-todo { height: 200px; justify-content: flex-start; padding: 15px; overflow: hidden; }
-        #todo-header { font-size: 0.8rem; font-weight: bold; color: var(--accent); margin-bottom: 10px; display: flex; justify-content: space-between; }
-        #todo-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
-        .todo-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; opacity: 0.8; transition: opacity 0.2s; }
-        .todo-item:hover { opacity: 1; }
-        .todo-item.done { text-decoration: line-through; opacity: 0.4; }
-        .todo-input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.2); color: white; width: 100%; padding: 5px; margin-top: 5px; font-size: 0.8rem; }
-        .todo-input:focus { border-color: var(--accent); }
+        .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
+        .msg.user { align-self: flex-end; background: var(--accent); color: #000; font-weight: 600; }
+        .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
+        .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.75rem; }
 
         /* --- MODAL --- */
         #modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
@@ -131,12 +110,9 @@
         textarea { width: 100%; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; resize: none; font-family: inherit; }
         .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
         .btn:hover { background: var(--accent); }
-
         input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: transparent; }
-
         .toggles { display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 0 20px; border-radius: 12px; min-height: 45px; }
         input[type="checkbox"] { accent-color: var(--accent); transform: scale(1.1); }
-
         #results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; overflow-y: auto; height: 200px; }
         .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
         .thumb:hover { border-color: var(--accent); }
@@ -148,28 +124,29 @@
     <img id="bg-image" src="" alt="">
     <div id="vignette"></div>
 
-    <!-- WIDGETS -->
-    <div id="widget-container">
+    <!-- THE DESKTOP (Widgets live here freely) -->
+    <div id="desktop">
+        
         <!-- Time -->
-        <div class="card" id="widget-time">
+        <div class="widget" id="w-time">
             <div id="clock">00:00</div>
             <div id="date">Loading...</div>
         </div>
         
-        <!-- Weather & Settings Row -->
-        <div class="grid-row">
-            <div class="card" id="widget-weather">
-                <div id="temp">--°</div>
-                <div id="condition">...</div>
-            </div>
-            <div class="card" id="widget-settings" onclick="toggleModal()">
-                <div id="gear-icon">⚙️</div>
-                <div class="label">Config</div>
-            </div>
+        <!-- Weather -->
+        <div class="widget" id="w-weather">
+            <div id="temp">--°</div>
+            <div id="condition">...</div>
+        </div>
+
+        <!-- Settings Button -->
+        <div class="widget" id="w-settings" onclick="handleSettingsClick()">
+            <div id="gear-icon">⚙️</div>
+            <div class="label">Config</div>
         </div>
 
         <!-- To-Do List -->
-        <div class="card" id="widget-todo">
+        <div class="widget" id="w-todo">
             <div id="todo-header">
                 <span>FOCUS LIST</span>
                 <span style="cursor:pointer; opacity:0.5;" onclick="clearDoneTodos()">Clear Done</span>
@@ -177,11 +154,9 @@
             <div id="todo-list"></div>
             <input type="text" class="todo-input" placeholder="+ Add task (Enter)" onkeypress="handleTodoEnter(event)">
         </div>
-    </div>
 
-    <!-- AI CHAT -->
-    <div id="ai-container">
-        <div id="chat-window">
+        <!-- AI Chat -->
+        <div class="widget" id="w-chat">
             <div class="chat-header">
                 <div>AI ASSISTANT <span style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">FAST</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
@@ -192,15 +167,7 @@
                 <button id="send-btn" onclick="sendMessage()">→</button>
             </div>
         </div>
-    </div>
 
-    <!-- DOCK (Quick Links) -->
-    <div id="dock-container">
-        <a href="https://google.com" target="_blank" class="dock-icon" title="Google">🔍</a>
-        <a href="https://youtube.com" target="_blank" class="dock-icon" title="YouTube">📺</a>
-        <a href="https://reddit.com" target="_blank" class="dock-icon" title="Reddit">👽</a>
-        <a href="https://github.com" target="_blank" class="dock-icon" title="GitHub">🐙</a>
-        <a href="https://chatgpt.com" target="_blank" class="dock-icon" title="ChatGPT">🤖</a>
     </div>
 
     <!-- SETTINGS MODAL -->
@@ -208,9 +175,21 @@
         <div id="search-modal">
             <h3 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Configuration</h3>
             
+            <!-- LAYOUT CONTROLS -->
+            <div class="controls-row" style="align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--accent);">
+                <label style="color:var(--accent); font-weight:bold;">UNLOCK WIDGETS (Move)</label>
+                <div class="toggles" style="padding:0; background:transparent; min-height:auto;">
+                    <label class="toggle-label"><input type="checkbox" id="chk-editmode" onchange="toggleEditMode(this)"> ENABLE DRAG</label>
+                </div>
+            </div>
+
+            <div style="text-align:right;">
+                <button class="btn" style="background: rgba(255,255,255,0.1); font-size:0.8rem;" onclick="resetLayout()">Reset Positions</button>
+            </div>
+
             <!-- THEME -->
             <div class="controls-row" style="align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px;">
-                <label style="color:var(--accent); font-weight:bold;">ACCENT COLOR</label>
+                <label style="color:white; font-weight:bold;">ACCENT COLOR</label>
                 <input type="color" id="accent-picker" value="#87CEEB" onchange="updateAccent(this.value)">
             </div>
 
@@ -227,13 +206,11 @@
                     <input type="text" id="search-query" placeholder="Tag (e.g. Cyberpunk)" value="scenery">
                     <button class="btn" onclick="searchWallhaven()">Search</button>
                 </div>
-                
                 <div class="toggles" style="margin-top: 10px;">
                     <label class="toggle-label"><input type="checkbox" id="chk-sfw" checked> SFW</label>
                     <label class="toggle-label" style="color: #ffd700;"><input type="checkbox" id="chk-sketchy"> Sketchy</label>
                     <label class="toggle-label" style="color: #ff4444;"><input type="checkbox" id="chk-nsfw"> NSFW</label>
                 </div>
-
                 <div id="results-grid"></div>
             </div>
 
@@ -260,45 +237,159 @@
         const systemInput = document.getElementById('system-instruction');
         const todoList = document.getElementById('todo-list');
         const accentPicker = document.getElementById('accent-picker');
+        const editCheck = document.getElementById('chk-editmode');
 
         // --- INIT ---
         window.onload = () => {
-            // Load AI Settings
+            loadWidgetPositions(); // Restore positions first
+            
+            // Load Settings
             const savedSystem = localStorage.getItem('system_instruction');
             if(savedSystem) systemInput.value = savedSystem;
             
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "Connected to Pollinations AI. Ready.");
+            else addMsg("system", "Connected. Ready.");
 
-            // Load Theme
             const savedAccent = localStorage.getItem('accent_color');
             if(savedAccent) {
                 updateAccent(savedAccent);
                 accentPicker.value = savedAccent;
             }
 
-            // Load Todos
             loadTodos();
-
             updateTime();
             fetchWeather();
         };
 
-        // --- THEME LOGIC ---
+        // --- DRAG AND DROP ENGINE ---
+        let isEditMode = false;
+        
+        function toggleEditMode(checkbox) {
+            isEditMode = checkbox.checked;
+            if(isEditMode) {
+                document.body.classList.add('edit-mode');
+                enableDrag();
+            } else {
+                document.body.classList.remove('edit-mode');
+                disableDrag();
+            }
+        }
+
+        // Make widgets draggable
+        function enableDrag() {
+            const widgets = document.querySelectorAll('.widget');
+            widgets.forEach(w => {
+                w.onmousedown = dragMouseDown;
+            });
+        }
+
+        function disableDrag() {
+            const widgets = document.querySelectorAll('.widget');
+            widgets.forEach(w => {
+                w.onmousedown = null;
+            });
+        }
+
+        function dragMouseDown(e) {
+            if(!isEditMode) return;
+            e.preventDefault();
+            // get the mouse cursor position at startup:
+            let pos3 = e.clientX;
+            let pos4 = e.clientY;
+            let elmnt = this; // The widget
+
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+
+            function elementDrag(e) {
+                e.preventDefault();
+                // calculate the new cursor position:
+                let pos1 = pos3 - e.clientX;
+                let pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // set the element's new position:
+                let newTop = (elmnt.offsetTop - pos2);
+                let newLeft = (elmnt.offsetLeft - pos1);
+                
+                elmnt.style.top = newTop + "px";
+                elmnt.style.left = newLeft + "px";
+                // Remove right/bottom positioning so top/left takes over
+                elmnt.style.right = 'auto';
+                elmnt.style.bottom = 'auto';
+            }
+
+            function closeDragElement() {
+                // stop moving when mouse button is released:
+                document.onmouseup = null;
+                document.onmousemove = null;
+                
+                // SNAP TO GRID (20px)
+                let snapTop = Math.round(elmnt.offsetTop / 20) * 20;
+                let snapLeft = Math.round(elmnt.offsetLeft / 20) * 20;
+                elmnt.style.top = snapTop + "px";
+                elmnt.style.left = snapLeft + "px";
+
+                saveWidgetPositions();
+            }
+        }
+
+        function saveWidgetPositions() {
+            const widgets = document.querySelectorAll('.widget');
+            let positions = {};
+            widgets.forEach(w => {
+                positions[w.id] = { 
+                    top: w.style.top, 
+                    left: w.style.left,
+                    // If we moved it, we nullify right/bottom. If it wasn't moved, these might be empty strings, which is fine.
+                };
+            });
+            localStorage.setItem('widget_positions', JSON.stringify(positions));
+        }
+
+        function loadWidgetPositions() {
+            const saved = localStorage.getItem('widget_positions');
+            if(saved) {
+                const positions = JSON.parse(saved);
+                for (const [id, pos] of Object.entries(positions)) {
+                    const el = document.getElementById(id);
+                    if(el && pos.top && pos.left) {
+                        el.style.top = pos.top;
+                        el.style.left = pos.left;
+                        el.style.right = 'auto';
+                        el.style.bottom = 'auto';
+                    }
+                }
+            }
+        }
+
+        function resetLayout() {
+            if(confirm("Reset all widget positions to default?")) {
+                localStorage.removeItem('widget_positions');
+                location.reload();
+            }
+        }
+
+        // --- PREVENT CLICKING SETTINGS WHILE DRAGGING ---
+        function handleSettingsClick() {
+            if(!isEditMode) toggleModal();
+        }
+
+        // --- THEME ---
         function updateAccent(color) {
             document.documentElement.style.setProperty('--accent', color);
             localStorage.setItem('accent_color', color);
         }
 
-        // --- TO-DO LOGIC ---
+        // --- TO-DO ---
         function handleTodoEnter(e) {
             if(e.key === 'Enter' && e.target.value.trim() !== "") {
                 addTodo(e.target.value.trim());
                 e.target.value = "";
             }
         }
-
         function addTodo(text) {
             const div = document.createElement('div');
             div.className = 'todo-item';
@@ -306,33 +397,25 @@
             todoList.appendChild(div);
             saveTodos();
         }
-
         function toggleTodo(checkbox) {
             const item = checkbox.parentElement;
             if(checkbox.checked) item.classList.add('done');
             else item.classList.remove('done');
             saveTodos();
         }
-
         function clearDoneTodos() {
             const dones = document.querySelectorAll('.todo-item.done');
             dones.forEach(el => el.remove());
             saveTodos();
         }
-
-        function saveTodos() {
-            localStorage.setItem('todo_html', todoList.innerHTML);
-        }
-
+        function saveTodos() { localStorage.setItem('todo_html', todoList.innerHTML); }
         function loadTodos() {
             const saved = localStorage.getItem('todo_html');
             if(saved) {
                 todoList.innerHTML = saved;
-                // Re-bind click events for restored checkboxes
                 const checks = todoList.querySelectorAll('input[type="checkbox"]');
                 checks.forEach(box => {
                     box.onclick = function() { toggleTodo(this); };
-                    // Ensure visual state matches checked state
                     if(box.checked) box.parentElement.classList.add('done');
                 });
             }
@@ -407,18 +490,13 @@
         async function searchWallhaven() {
             const query = document.getElementById('search-query').value || 'random';
             const purity = getPurity();
-            
             resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
-            
             try {
                 const seed = Math.floor(Math.random() * 999999);
                 const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
-                // Use AllOrigins Proxy
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-                
                 const res = await fetch(proxyUrl);
                 const data = await res.json();
-                
                 resultsGrid.innerHTML = '';
                 if (data.data && data.data.length > 0) {
                     data.data.forEach(imgData => {
