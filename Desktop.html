@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini Dashboard V11 (Fail-Safe)</title>
+    <style>
+        /* --- RESET --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        body {
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+            background: #111;
+            color: white;
+            user-select: none;
+        }
+
+        /* --- LAYOUT --- */
+        #bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; transition: opacity 0.5s; }
+        #vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%); z-index: 1; pointer-events: none; }
+
+        #widget-container { position: absolute; top: 50%; right: 40px; transform: translateY(-50%); width: 350px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; z-index: 10; }
+        #ai-container { position: absolute; bottom: 40px; left: 40px; width: 400px; height: 550px; z-index: 10; }
+
+        /* --- CHAT/NOTES --- */
+        #chat-window {
+            width: 100%; height: 100%;
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            display: flex; flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.9rem; font-weight: bold; opacity: 0.9;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255,255,255,0.03);
+        }
+
+        /* Status Badge */
+        #status-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; font-weight: bold; }
+        .status-online { background: #51cf66; color: #000; }
+        .status-offline { background: #ff6b6b; color: #fff; }
+
+        #chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+        .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
+        .msg.user { align-self: flex-end; background: #87CEEB; color: #111; font-weight: 600; }
+        .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
+        .msg.note { width: 100%; max-width: 100%; background: rgba(255,255,100,0.1); border-left: 3px solid #ffd43b; border-radius: 4px; color: #fff; font-family: monospace; }
+
+        .chat-input-area { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
+        #chat-input { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 15px; color: white; }
+        #chat-input:focus { border-color: #87CEEB; }
+        #send-btn { background: white; color: black; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+
+        /* --- CARDS --- */
+        .card { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+        #widget-time { grid-column: span 2; }
+        #clock { font-size: 3.5rem; font-weight: 700; line-height: 1; letter-spacing: -2px; }
+        #date { font-size: 1.1rem; opacity: 0.7; margin-top: 5px; }
+        #widget-weather { grid-column: span 1; aspect-ratio: 1/1; }
+        #temp { font-size: 2.2rem; font-weight: 600; }
+        #widget-settings { grid-column: span 1; aspect-ratio: 1/1; align-items: center; cursor: pointer; text-align: center; }
+        #gear-icon { font-size: 2rem; margin-bottom: 5px; }
+
+        /* --- MODAL --- */
+        #modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        #modal-overlay.active { opacity: 1; pointer-events: all; }
+        #search-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; max-height: 90vh; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 30px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+
+        .controls-row { display: flex; gap: 10px; }
+        input[type="text"], input[type="password"] { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; }
+        .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
+        #results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; overflow-y: auto; height: 200px; }
+        .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
+        .thumb:hover { border-color: #87CEEB; }
+
+    </style>
+</head>
+<body>
+
+    <img id="bg-image" src="" alt="">
+    <div id="vignette"></div>
+
+    <div id="widget-container">
+        <div class="card" id="widget-time">
+            <div id="clock">00:00</div>
+            <div id="date">Loading...</div>
+        </div>
+        <div class="card" id="widget-weather">
+            <div id="temp">--°</div>
+            <div id="condition">...</div>
+        </div>
+        <div class="card" id="widget-settings" onclick="toggleModal()">
+            <div id="gear-icon">⚙️</div>
+            <div class="label">Config</div>
+        </div>
+    </div>
+
+    <div id="ai-container">
+        <div id="chat-window">
+            <div class="chat-header">
+                <div>ASSISTANT <span id="status-badge" class="status-offline">CHECKING...</span></div>
+                <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
+            </div>
+            <div id="chat-history"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Type here..." onkeypress="handleEnter(event)">
+                <button id="send-btn" onclick="handleInput()">→</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" onclick="if(event.target === this) toggleModal()">
+        <div id="search-modal">
+            <h3>Configuration</h3>
+            <div>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">GEMINI API KEY</label>
+                <input type="password" id="gemini-key" placeholder="Paste Key..." style="width: 100%; margin-top:5px;" onchange="saveSettings()">
+            </div>
+            <div>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">WALLHAVEN SEARCH</label>
+                <div class="controls-row" style="margin-top:5px;">
+                    <input type="text" id="search-query" placeholder="Tag" value="scenery">
+                    <button class="btn" onclick="searchWallhaven()">Search</button>
+                </div>
+                <div id="results-grid"></div>
+            </div>
+            <div>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">LOCAL FILE (Best for Offline)</label>
+                <input type="file" id="local-file" accept="image/*" onchange="handleLocalFile(this)" style="width: 100%; margin-top:5px;">
+            </div>
+            <button class="btn" style="width: 100%; background: #333; color: white; margin-top: 10px;" onclick="toggleModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9';
+        const LAT = 40.7128;
+        const LON = -74.0060;
+        const DEFAULT_GEMINI_KEY = 'AIzaSyDgp2jqTk9TxsQCKwU4BafNctQ0n2BAgnQ';
+
+        // --- STATE ---
+        let isOnline = false;
+
+        // --- DOM ---
+        const bgImage = document.getElementById('bg-image');
+        const resultsGrid = document.getElementById('results-grid');
+        const chatHistory = document.getElementById('chat-history');
+        const keyInput = document.getElementById('gemini-key');
+        const statusBadge = document.getElementById('status-badge');
+        const chatInput = document.getElementById('chat-input');
+
+        // --- INIT ---
+        window.onload = () => {
+            const savedKey = localStorage.getItem('gemini_key');
+            keyInput.value = savedKey || DEFAULT_GEMINI_KEY;
+
+            const savedChat = localStorage.getItem('chat_history');
+            if(savedChat) chatHistory.innerHTML = savedChat;
+            else addMsg("ai", "Initializing...");
+
+            checkConnectivity();
+            updateTime();
+            fetchWeather();
+        };
+
+        // --- CORE LOGIC ---
+
+        async function checkConnectivity() {
+            try {
+                // Try a harmless fetch to Google Fonts to test internet
+                await fetch("https://fonts.googleapis.com/css?family=Roboto", { mode: 'no-cors' });
+                isOnline = true;
+                statusBadge.innerText = "ONLINE (AI)";
+                statusBadge.className = "status-online";
+                chatInput.placeholder = "Message Gemini...";
+                addMsg("ai", "Network detected. AI systems active.");
+            } catch (e) {
+                isOnline = false;
+                statusBadge.innerText = "OFFLINE (NOTES)";
+                statusBadge.className = "status-offline";
+                chatInput.placeholder = "Save a local note...";
+                addMsg("ai", "Network Blocked. Switched to **Local Notepad Mode**. Messages will be saved locally.");
+            }
+        }
+
+        function saveSettings() { localStorage.setItem('gemini_key', keyInput.value); }
+        function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
+        function handleEnter(e) { if(e.key === 'Enter') handleInput(); }
+
+        function addMsg(role, text) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            chatHistory.appendChild(div);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            localStorage.setItem('chat_history', chatHistory.innerHTML);
+        }
+
+        function handleInput() {
+            const text = chatInput.value.trim();
+            if(!text) return;
+            chatInput.value = '';
+
+            if (isOnline) {
+                // Online: Send to AI
+                sendMessageToAI(text);
+            } else {
+                // Offline: Save as Note
+                addMsg("note", `> ${text}`);
+            }
+        }
+
+        async function sendMessageToAI(text) {
+            const apiKey = keyInput.value || DEFAULT_GEMINI_KEY;
+            addMsg("user", text);
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'msg ai';
+            loadingDiv.innerText = '...';
+            loadingDiv.id = 'loading-msg';
+            chatHistory.appendChild(loadingDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ role: "user", parts: [{ text: text }] }] };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    referrerPolicy: 'no-referrer',
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                document.getElementById('loading-msg').remove();
+
+                if(data.error) {
+                    addMsg("error", `API Error: ${data.error.message}`);
+                } else {
+                    addMsg("ai", data.candidates[0].content.parts[0].text);
+                }
+            } catch (e) {
+                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
+                addMsg("error", "Request failed. Switching to Offline Mode.");
+                isOnline = false;
+                statusBadge.innerText = "OFFLINE (NOTES)";
+                statusBadge.className = "status-offline";
+            }
+        }
+
+        // --- WALLHAVEN ---
+        function toggleModal() { document.getElementById('modal-overlay').classList.toggle('active'); }
+
+        async function searchWallhaven() {
+            if(!isOnline) {
+                alert("Cannot search Wallhaven: Offline Mode Active.");
+                return;
+            }
+            const query = document.getElementById('search-query').value || 'random';
+            resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
+
+            try {
+                const seed = Math.floor(Math.random() * 999999);
+                // Using AllOrigins Proxy as primary for Linux
+                const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=100&sorting=random&seed=${seed}&page=1`;
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+
+                const res = await fetch(proxyUrl);
+                const data = await res.json();
+
+                resultsGrid.innerHTML = '';
+                if (data.data && data.data.length > 0) {
+                    data.data.forEach(imgData => {
+                        const img = document.createElement('img');
+                        img.className = 'thumb';
+                        img.src = imgData.thumbs.small;
+                        img.onclick = () => { bgImage.src = imgData.path; };
+                        resultsGrid.appendChild(img);
+                    });
+                } else {
+                    resultsGrid.innerHTML = 'No results found.';
+                }
+            } catch (e) {
+                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Blocked.</div>`;
+            }
+        }
+
+        function handleLocalFile(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) { bgImage.src = e.target.result; toggleModal(); };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('clock').innerText = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+            document.getElementById('date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            setTimeout(updateTime, 1000);
+        }
+
+        async function fetchWeather() {
+            try {
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`, { referrerPolicy: 'no-referrer' });
+                const data = await res.json();
+                document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°C`;
+                document.getElementById('condition').innerText = "Active";
+            } catch (e) { console.log("Weather failed"); }
+        }
+    </script>
+</body>
+</html>
