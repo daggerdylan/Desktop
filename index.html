@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>Gemini Dashboard V13 (Debug Mode)</title>
+    <title>Gemini Dashboard V14 (Brute Force)</title>
     <style>
         /* --- RESET --- */
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
@@ -110,7 +110,7 @@
     <div id="ai-container">
         <div id="chat-window">
             <div class="chat-header">
-                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">DEBUG</span></div>
+                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">AUTO</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
             </div>
             <div id="chat-history"></div>
@@ -163,6 +163,7 @@
         const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9'; 
         const LAT = 40.7128; 
         const LON = -74.0060; 
+        // THIS IS THE KEY YOU PROVIDED. IT IS HARDCODED AS DEFAULT.
         const DEFAULT_GEMINI_KEY = 'AIzaSyDgp2jqTk9TxsQCKwU4BafNctQ0n2BAgnQ';
 
         // --- DOM ---
@@ -179,7 +180,7 @@
             
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "Debug Mode Online.");
+            else addMsg("system", "System Online. Type to test connection.");
 
             updateTime();
             fetchWeather();
@@ -199,6 +200,15 @@
             localStorage.setItem('chat_history', chatHistory.innerHTML);
         }
 
+        // --- GEMINI BRUTE FORCE ---
+        // Google keeps changing model names. We will try ALL OF THEM until one works.
+        const MODEL_LIST = [
+            "gemini-1.5-flash", 
+            "gemini-1.5-flash-latest",
+            "gemini-pro",
+            "gemini-1.0-pro"
+        ];
+
         async function sendMessage() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
@@ -210,35 +220,35 @@
 
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'msg ai';
-            loadingDiv.innerText = '...';
+            loadingDiv.innerText = 'Thinking...';
             loadingDiv.id = 'loading-msg';
             chatHistory.appendChild(loadingDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
-            // Debug logic: Capture actual error message
+            let success = false;
             let lastError = "";
 
-            // TRY MODEL 1: FLASH
-            try {
-                await callGemini("gemini-1.5-flash", apiKey, text);
-            } catch (e) {
-                lastError = `1.5 Flash: ${e.message}`;
-                console.warn("Flash failed:", e);
-                
-                // TRY MODEL 2: PRO (Fallback)
+            // Loop through models
+            for (let model of MODEL_LIST) {
                 try {
-                    await callGemini("gemini-1.0-pro", apiKey, text);
-                } catch (e2) {
-                    if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                    
-                    // IF NETWORK ERROR
-                    if(e2.message.includes("Failed to fetch")) {
-                        addMsg("error", "NETWORK ERROR: The Linux plugin blocked the connection. <br>Solution: Host this on GitHub Pages.");
-                    } else {
-                        // IF API ERROR
-                        addMsg("error", `ALL MODELS FAILED.<br>1. ${lastError}<br>2. Pro: ${e2.message}`);
+                    console.log("Trying model:", model);
+                    await callGemini(model, apiKey, text);
+                    success = true;
+                    break; // It worked! Stop loop.
+                } catch (e) {
+                    console.warn(`Model ${model} failed:`, e.message);
+                    lastError = e.message;
+                    // If it's a network error (not a 404), break immediately because no model will work without internet
+                    if (e.message.includes("Failed to fetch") || e.message.includes("Network")) {
+                         lastError = "Network Blocked by Linux/Browser.";
+                         break;
                     }
                 }
+            }
+
+            if (!success) {
+                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
+                addMsg("error", `ALL MODELS FAILED.<br>Reason: ${lastError}`);
             }
         }
 
@@ -256,12 +266,11 @@
             const data = await res.json();
             
             if(data.error) {
-                // If the key is bad or model not found, throw actual error
                 throw new Error(`${data.error.code} - ${data.error.message}`);
             } else {
                 if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
                 addMsg("ai", data.candidates[0].content.parts[0].text);
-                modelDisplay.innerText = model.toUpperCase().replace("GEMINI-", "");
+                modelDisplay.innerText = model.replace("gemini-", "").toUpperCase();
             }
         }
 
@@ -283,7 +292,7 @@
             try {
                 const seed = Math.floor(Math.random() * 999999);
                 const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
-                // Use AllOrigins Proxy
+                // Using AllOrigins Proxy
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
                 
                 const res = await fetch(proxyUrl);
@@ -302,7 +311,7 @@
                     resultsGrid.innerHTML = 'No results found.';
                 }
             } catch (e) {
-                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Error.<br>Plugin is blocking connection.</div>`;
+                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Error.<br>Plugin blocked connection.</div>`;
             }
         }
 
