@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>Gemini Dashboard V14 (Brute Force)</title>
+    <title>AI Horde Dashboard (No Key Required)</title>
     <style>
         /* --- RESET --- */
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
@@ -110,12 +110,12 @@
     <div id="ai-container">
         <div id="chat-window">
             <div class="chat-header">
-                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">AUTO</span></div>
+                <div>AI HORDE <span id="status-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">REMOTE</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
             </div>
             <div id="chat-history"></div>
             <div class="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Message..." onkeypress="handleEnter(event)">
+                <input type="text" id="chat-input" placeholder="Chat with Horde..." onkeypress="handleEnter(event)">
                 <button id="send-btn" onclick="sendMessage()">→</button>
             </div>
         </div>
@@ -125,10 +125,14 @@
         <div id="search-modal">
             <h3 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Configuration</h3>
             
-            <!-- API KEY -->
-            <div>
-                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">GEMINI API KEY</label>
-                <input type="password" id="gemini-key" placeholder="Paste Key..." style="width: 100%; margin-top:5px;" onchange="saveSettings()">
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">🤖 AI STATUS</label>
+                <div style="font-size: 0.8rem; margin-top:5px; line-height: 1.4;">
+                    Using <strong>AI Horde</strong> (Crowd-sourced GPUs).<br>
+                    <strong>Cost:</strong> Free.<br>
+                    <strong>Hardware:</strong> None required.<br>
+                    <strong>Key:</strong> "0000000000" (Anonymous).
+                </div>
             </div>
 
             <!-- WALLHAVEN -->
@@ -150,7 +154,7 @@
 
             <!-- LOCAL FILE -->
             <div>
-                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">LOCAL FILE (Offline)</label>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">LOCAL FILE</label>
                 <input type="file" id="local-file" accept="image/*" onchange="handleLocalFile(this)" style="width: 100%; margin-top:5px;">
             </div>
             
@@ -163,114 +167,124 @@
         const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9'; 
         const LAT = 40.7128; 
         const LON = -74.0060; 
-        // THIS IS THE KEY YOU PROVIDED. IT IS HARDCODED AS DEFAULT.
-        const DEFAULT_GEMINI_KEY = 'AIzaSyDgp2jqTk9TxsQCKwU4BafNctQ0n2BAgnQ';
 
         // --- DOM ---
         const bgImage = document.getElementById('bg-image');
         const resultsGrid = document.getElementById('results-grid');
         const chatHistory = document.getElementById('chat-history');
-        const keyInput = document.getElementById('gemini-key');
-        const modelDisplay = document.getElementById('model-display');
+        const statusDisplay = document.getElementById('status-display');
 
         // --- INIT ---
         window.onload = () => {
-            const savedKey = localStorage.getItem('gemini_key');
-            keyInput.value = savedKey || DEFAULT_GEMINI_KEY;
-            
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "System Online. Type to test connection.");
+            else addMsg("system", "Connected to AI Horde. No API key needed.");
 
             updateTime();
             fetchWeather();
         };
 
         // --- LOGIC ---
-        function saveSettings() { localStorage.setItem('gemini_key', keyInput.value); }
         function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
         function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
 
         function addMsg(role, text) {
             const div = document.createElement('div');
             div.className = `msg ${role}`;
-            div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            // Basic Markdown
+            let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            formatted = formatted.replace(/\n/g, '<br>');
+            div.innerHTML = formatted;
             chatHistory.appendChild(div);
             chatHistory.scrollTop = chatHistory.scrollHeight;
             localStorage.setItem('chat_history', chatHistory.innerHTML);
         }
 
-        // --- GEMINI BRUTE FORCE ---
-        // Google keeps changing model names. We will try ALL OF THEM until one works.
-        const MODEL_LIST = [
-            "gemini-1.5-flash", 
-            "gemini-1.5-flash-latest",
-            "gemini-pro",
-            "gemini-1.0-pro"
-        ];
+        // --- AI HORDE LOGIC ---
+        // 1. Submit Request -> Get ID
+        // 2. Poll Status -> Wait for Done
+        // 3. Get Result
 
         async function sendMessage() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
-            const apiKey = keyInput.value || DEFAULT_GEMINI_KEY;
-
             if(!text) return;
+
             addMsg("user", text);
             input.value = '';
 
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'msg ai';
-            loadingDiv.innerText = 'Thinking...';
+            loadingDiv.innerText = 'Queued...';
             loadingDiv.id = 'loading-msg';
             chatHistory.appendChild(loadingDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
-            let success = false;
-            let lastError = "";
+            try {
+                // Step 1: Submit to Horde
+                const prompt = `### Instruction:\n${text}\n### Response:\n`;
+                
+                const submitRes = await fetch("https://stablehorde.net/api/v2/generate/text/async", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "apikey": "0000000000", // Anonymous Key
+                        "Client-Agent": "WallpaperDashboard:v1:Anon"
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        params: {
+                            n: 1,
+                            max_context_length: 512,
+                            max_length: 150,
+                            temperature: 0.7
+                        },
+                        models: ["koboldcpp/Llama-3-8b-Instruct-Q8_0"] // Popular model
+                    })
+                });
 
-            // Loop through models
-            for (let model of MODEL_LIST) {
-                try {
-                    console.log("Trying model:", model);
-                    await callGemini(model, apiKey, text);
-                    success = true;
-                    break; // It worked! Stop loop.
-                } catch (e) {
-                    console.warn(`Model ${model} failed:`, e.message);
-                    lastError = e.message;
-                    // If it's a network error (not a 404), break immediately because no model will work without internet
-                    if (e.message.includes("Failed to fetch") || e.message.includes("Network")) {
-                         lastError = "Network Blocked by Linux/Browser.";
-                         break;
+                const submitData = await submitRes.json();
+                const id = submitData.id;
+                
+                if(!id) throw new Error(submitData.message || "Failed to join queue");
+
+                // Step 2: Poll for completion
+                let attempts = 0;
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    document.getElementById('loading-msg').innerText = `Thinking (${attempts}s)...`;
+                    
+                    try {
+                        const checkRes = await fetch(`https://stablehorde.net/api/v2/generate/text/status/${id}`, {
+                            headers: { "Client-Agent": "WallpaperDashboard:v1:Anon" }
+                        });
+                        const checkData = await checkRes.json();
+
+                        if (checkData.finished === 1) {
+                            clearInterval(pollInterval);
+                            document.getElementById('loading-msg').remove();
+                            // Done!
+                            const finalRes = checkData.generations[0].text;
+                            addMsg("ai", finalRes);
+                        } else if (checkData.fault) {
+                            clearInterval(pollInterval);
+                            throw new Error("Generation Fault");
+                        }
+                        
+                        // Timeout after 60s
+                        if (attempts > 30) {
+                            clearInterval(pollInterval);
+                            throw new Error("Timed out waiting for GPU");
+                        }
+                    } catch(pollErr) {
+                        clearInterval(pollInterval);
+                        if(document.getElementById('loading-msg')) document.getElementById('loading-msg').innerText = "Error polling.";
                     }
-                }
-            }
+                }, 2000); // Check every 2s
 
-            if (!success) {
+            } catch (e) {
                 if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                addMsg("error", `ALL MODELS FAILED.<br>Reason: ${lastError}`);
-            }
-        }
-
-        async function callGemini(model, key, prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                referrerPolicy: 'no-referrer',
-                body: JSON.stringify(payload)
-            });
-
-            const data = await res.json();
-            
-            if(data.error) {
-                throw new Error(`${data.error.code} - ${data.error.message}`);
-            } else {
-                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                addMsg("ai", data.candidates[0].content.parts[0].text);
-                modelDisplay.innerText = model.replace("gemini-", "").toUpperCase();
+                addMsg("error", "Horde Error: " + e.message);
             }
         }
 
@@ -286,18 +300,13 @@
         async function searchWallhaven() {
             const query = document.getElementById('search-query').value || 'random';
             const purity = getPurity();
-            
             resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
-            
             try {
                 const seed = Math.floor(Math.random() * 999999);
                 const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
-                // Using AllOrigins Proxy
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-                
                 const res = await fetch(proxyUrl);
                 const data = await res.json();
-                
                 resultsGrid.innerHTML = '';
                 if (data.data && data.data.length > 0) {
                     data.data.forEach(imgData => {
@@ -311,7 +320,7 @@
                     resultsGrid.innerHTML = 'No results found.';
                 }
             } catch (e) {
-                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Error.<br>Plugin blocked connection.</div>`;
+                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Error.</div>`;
             }
         }
 
@@ -332,7 +341,7 @@
 
         async function fetchWeather() {
             try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`, { referrerPolicy: 'no-referrer' });
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`);
                 const data = await res.json();
                 document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°C`;
             } catch (e) {}
