@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>Dashboard V19 (Free Move)</title>
+    <title>Dashboard V20 (Modular Grid)</title>
     <style>
         /* --- VARIABLES --- */
         :root {
             --accent: #87CEEB;
-            --bg-glass: rgba(20, 20, 20, 0.85);
+            --bg-glass: rgba(20, 20, 20, 0.9);
             --border: rgba(255, 255, 255, 0.15);
+            
+            /* THE GRID MATH */
+            --unit: 160px;
+            --gap: 20px;
         }
 
         /* --- RESET --- */
@@ -27,81 +31,107 @@
             user-select: none;
         }
 
-        /* --- LAYOUT --- */
+        /* --- BACKGROUND --- */
         #bg-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; transition: opacity 0.5s; }
         #vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%); z-index: 1; pointer-events: none; }
 
-        /* --- DESKTOP AREA --- */
+        /* --- EDIT MODE GRID OVERLAY --- */
+        #grid-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px; /* Snapping visual guide */
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        body.edit-mode #grid-overlay { opacity: 1; }
+
+        /* --- DESKTOP LAYER --- */
         #desktop {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none; /* Allow clicks to pass through empty space */
+            z-index: 10; pointer-events: none; 
         }
 
-        /* --- WIDGET COMMON STYLES --- */
+        /* --- WIDGET BASE STYLES --- */
         .widget {
             position: absolute;
             background: var(--bg-glass);
             border: 1px solid var(--border);
             border-radius: 24px;
             padding: 20px;
-            backdrop-filter: blur(15px);
+            backdrop-filter: blur(20px);
             display: flex; flex-direction: column; justify-content: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            pointer-events: auto; /* Re-enable clicks on widgets */
+            pointer-events: auto; 
             transition: border-color 0.2s, transform 0.1s, box-shadow 0.2s;
         }
 
-        /* Edit Mode Styles */
+        /* Edit Mode Behavior */
         body.edit-mode .widget {
             border: 2px dashed var(--accent);
             cursor: grab;
-            animation: breathe 2s infinite;
+            z-index: 100; /* Bring grabbed item to top */
         }
-        body.edit-mode .widget:active { cursor: grabbing; transform: scale(1.02); }
-        @keyframes breathe { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.1); } 50% { box-shadow: 0 0 20px 0 rgba(255,255,255,0.2); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.1); } }
+        body.edit-mode .widget:active { cursor: grabbing; transform: scale(1.02); box-shadow: 0 20px 50px rgba(0,0,0,0.7); }
 
-        /* --- SPECIFIC WIDGETS --- */
+        /* --- MODULAR SIZES --- */
+        /* 1x1 */
+        .size-1x1 { width: var(--unit); height: var(--unit); }
+        /* 2x1 */
+        .size-2x1 { width: calc(var(--unit) * 2 + var(--gap)); height: var(--unit); }
+        /* 2x2 */
+        .size-2x2 { width: calc(var(--unit) * 2 + var(--gap)); height: calc(var(--unit) * 2 + var(--gap)); }
+        /* 2x3 (Chat) */
+        .size-2x3 { width: calc(var(--unit) * 2 + var(--gap)); height: calc(var(--unit) * 3 + var(--gap) * 2); }
+
+        /* --- WIDGET CONTENT --- */
         
-        /* Time: Default Top Right */
-        #w-time { top: 50px; right: 50px; width: 300px; height: 150px; align-items: flex-start; }
+        /* Time */
+        #w-time { align-items: flex-start; justify-content: center; padding-left: 30px; }
         #clock { font-size: 3.5rem; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--accent); }
-        #date { font-size: 1.1rem; opacity: 0.7; margin-top: 5px; }
+        #date { font-size: 1rem; opacity: 0.7; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* Weather: Default Below Time */
-        #w-weather { top: 220px; right: 210px; width: 140px; height: 140px; align-items: center; text-align: center; }
+        /* Weather */
+        #w-weather { align-items: center; text-align: center; }
         #temp { font-size: 2.2rem; font-weight: 600; }
+        #condition { font-size: 0.8rem; opacity: 0.7; margin-top: 5px; }
 
-        /* Settings: Default Right of Weather */
-        #w-settings { top: 220px; right: 50px; width: 140px; height: 140px; align-items: center; cursor: pointer; text-align: center; }
-        #gear-icon { font-size: 2rem; margin-bottom: 5px; transition: transform 0.5s; }
-        #w-settings:hover #gear-icon { transform: rotate(90deg); color: var(--accent); }
+        /* Settings */
+        #w-settings { align-items: center; cursor: pointer; text-align: center; transition: background 0.2s; }
+        #w-settings:hover { background: rgba(255,255,255,0.1); }
+        #gear-icon { font-size: 2.5rem; margin-bottom: 5px; transition: transform 0.5s; color: var(--accent); }
+        #w-settings:hover #gear-icon { transform: rotate(90deg); }
 
-        /* To-Do: Default Below Weather */
-        #w-todo { top: 380px; right: 50px; width: 300px; height: 250px; justify-content: flex-start; }
-        #todo-header { font-size: 0.8rem; font-weight: bold; color: var(--accent); margin-bottom: 10px; display: flex; justify-content: space-between; }
-        #todo-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
-        .todo-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; opacity: 0.8; }
+        /* To-Do */
+        #w-todo { justify-content: flex-start; overflow: hidden; }
+        #todo-header { font-size: 0.8rem; font-weight: bold; color: var(--accent); margin-bottom: 15px; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;}
+        #todo-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
+        .todo-item { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; cursor: pointer; opacity: 0.8; }
+        .todo-item:hover { opacity: 1; color: var(--accent); }
         .todo-item.done { text-decoration: line-through; opacity: 0.4; }
-        .todo-input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.2); color: white; width: 100%; padding: 5px; margin-top: 5px; font-size: 0.8rem; }
+        .todo-input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; width: 100%; padding: 10px; margin-top: 10px; font-size: 0.8rem; }
         .todo-input:focus { border-color: var(--accent); }
 
-        /* Chat: Default Bottom Left */
-        #w-chat { bottom: 50px; left: 50px; width: 400px; height: 500px; padding: 0; overflow: hidden; }
-        .chat-header { padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem; font-weight: bold; opacity: 0.9; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); }
-        #chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        /* Chat */
+        #w-chat { padding: 0; overflow: hidden; justify-content: flex-end; }
+        .chat-header { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem; font-weight: bold; opacity: 0.9; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); }
+        #chat-history { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .chat-input-area { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
         #chat-input { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 15px; color: white; }
         #chat-input:focus { border-color: var(--accent); }
         #send-btn { background: white; color: black; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-weight: bold; }
         #send-btn:hover { background: var(--accent); }
 
-        .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
+        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.85rem; line-height: 1.4; word-wrap: break-word; }
         .msg.user { align-self: flex-end; background: var(--accent); color: #000; font-weight: 600; }
         .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
         .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.75rem; }
 
         /* --- MODAL --- */
-        #modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        #modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
         #modal-overlay.active { opacity: 1; pointer-events: all; }
         #search-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; max-height: 90vh; background: #1a1a1a; border: 1px solid var(--border); border-radius: 24px; padding: 30px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
         
@@ -123,43 +153,44 @@
 
     <img id="bg-image" src="" alt="">
     <div id="vignette"></div>
+    <div id="grid-overlay"></div>
 
     <!-- THE DESKTOP (Widgets live here freely) -->
     <div id="desktop">
         
-        <!-- Time -->
-        <div class="widget" id="w-time">
+        <!-- Time (2x1) -->
+        <div class="widget size-2x1" id="w-time" style="top:40px; right:40px;">
             <div id="clock">00:00</div>
             <div id="date">Loading...</div>
         </div>
         
-        <!-- Weather -->
-        <div class="widget" id="w-weather">
+        <!-- Weather (1x1) -->
+        <div class="widget size-1x1" id="w-weather" style="top:220px; right:220px;">
             <div id="temp">--°</div>
             <div id="condition">...</div>
         </div>
 
-        <!-- Settings Button -->
-        <div class="widget" id="w-settings" onclick="handleSettingsClick()">
+        <!-- Settings (1x1) -->
+        <div class="widget size-1x1" id="w-settings" onclick="handleSettingsClick()" style="top:220px; right:40px;">
             <div id="gear-icon">⚙️</div>
-            <div class="label">Config</div>
+            <div class="label" style="font-size:0.7rem; opacity:0.6; margin-top:5px;">SETUP</div>
         </div>
 
-        <!-- To-Do List -->
-        <div class="widget" id="w-todo">
+        <!-- To-Do List (2x2) -->
+        <div class="widget size-2x2" id="w-todo" style="top:400px; right:40px;">
             <div id="todo-header">
-                <span>FOCUS LIST</span>
-                <span style="cursor:pointer; opacity:0.5;" onclick="clearDoneTodos()">Clear Done</span>
+                <span>FOCUS</span>
+                <span style="cursor:pointer; opacity:0.5; font-size:0.7rem;" onclick="clearDoneTodos()">CLEAR</span>
             </div>
             <div id="todo-list"></div>
-            <input type="text" class="todo-input" placeholder="+ Add task (Enter)" onkeypress="handleTodoEnter(event)">
+            <input type="text" class="todo-input" placeholder="+ Task..." onkeypress="handleTodoEnter(event)">
         </div>
 
-        <!-- AI Chat -->
-        <div class="widget" id="w-chat">
+        <!-- AI Chat (2x3) -->
+        <div class="widget size-2x3" id="w-chat" style="bottom:40px; left:40px;">
             <div class="chat-header">
-                <div>AI ASSISTANT <span style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">FAST</span></div>
-                <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
+                <div>ASSISTANT <span style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">FAST</span></div>
+                <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️</div>
             </div>
             <div id="chat-history"></div>
             <div class="chat-input-area">
@@ -177,9 +208,9 @@
             
             <!-- LAYOUT CONTROLS -->
             <div class="controls-row" style="align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--accent);">
-                <label style="color:var(--accent); font-weight:bold;">UNLOCK WIDGETS (Move)</label>
+                <label style="color:var(--accent); font-weight:bold;">ARRANGE WIDGETS</label>
                 <div class="toggles" style="padding:0; background:transparent; min-height:auto;">
-                    <label class="toggle-label"><input type="checkbox" id="chk-editmode" onchange="toggleEditMode(this)"> ENABLE DRAG</label>
+                    <label class="toggle-label"><input type="checkbox" id="chk-editmode" onchange="toggleEditMode(this)"> UNLOCK DRAGGING</label>
                 </div>
             </div>
 
@@ -195,8 +226,8 @@
 
             <!-- AI CONFIG -->
             <div>
-                <label style="color:var(--accent); font-size:0.8rem; font-weight:bold;">AI PERSONA</label>
-                <textarea id="system-instruction" placeholder="e.g. You are a helpful assistant..." style="margin-top:5px;" onchange="saveSettings()"></textarea>
+                <label style="color:var(--accent); font-size:0.8rem; font-weight:bold;">AI INSTRUCTIONS</label>
+                <textarea id="system-instruction" placeholder="e.g. You are a sassy robot..." style="margin-top:5px;" onchange="saveSettings()"></textarea>
             </div>
 
             <!-- WALLHAVEN -->
@@ -237,32 +268,27 @@
         const systemInput = document.getElementById('system-instruction');
         const todoList = document.getElementById('todo-list');
         const accentPicker = document.getElementById('accent-picker');
-        const editCheck = document.getElementById('chk-editmode');
 
         // --- INIT ---
         window.onload = () => {
-            loadWidgetPositions(); // Restore positions first
+            loadWidgetPositions();
             
-            // Load Settings
             const savedSystem = localStorage.getItem('system_instruction');
             if(savedSystem) systemInput.value = savedSystem;
             
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "Connected. Ready.");
+            else addMsg("system", "Online.");
 
             const savedAccent = localStorage.getItem('accent_color');
-            if(savedAccent) {
-                updateAccent(savedAccent);
-                accentPicker.value = savedAccent;
-            }
+            if(savedAccent) { updateAccent(savedAccent); accentPicker.value = savedAccent; }
 
             loadTodos();
             updateTime();
             fetchWeather();
         };
 
-        // --- DRAG AND DROP ENGINE ---
+        // --- DRAG ENGINE (With 20px Grid Snap) ---
         let isEditMode = false;
         
         function toggleEditMode(checkbox) {
@@ -276,57 +302,44 @@
             }
         }
 
-        // Make widgets draggable
         function enableDrag() {
             const widgets = document.querySelectorAll('.widget');
-            widgets.forEach(w => {
-                w.onmousedown = dragMouseDown;
-            });
+            widgets.forEach(w => w.onmousedown = dragMouseDown);
         }
 
         function disableDrag() {
             const widgets = document.querySelectorAll('.widget');
-            widgets.forEach(w => {
-                w.onmousedown = null;
-            });
+            widgets.forEach(w => w.onmousedown = null);
         }
 
         function dragMouseDown(e) {
             if(!isEditMode) return;
             e.preventDefault();
-            // get the mouse cursor position at startup:
             let pos3 = e.clientX;
             let pos4 = e.clientY;
-            let elmnt = this; // The widget
+            let elmnt = this;
 
             document.onmouseup = closeDragElement;
             document.onmousemove = elementDrag;
 
             function elementDrag(e) {
                 e.preventDefault();
-                // calculate the new cursor position:
                 let pos1 = pos3 - e.clientX;
                 let pos2 = pos4 - e.clientY;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 
-                // set the element's new position:
-                let newTop = (elmnt.offsetTop - pos2);
-                let newLeft = (elmnt.offsetLeft - pos1);
-                
-                elmnt.style.top = newTop + "px";
-                elmnt.style.left = newLeft + "px";
-                // Remove right/bottom positioning so top/left takes over
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
                 elmnt.style.right = 'auto';
                 elmnt.style.bottom = 'auto';
             }
 
             function closeDragElement() {
-                // stop moving when mouse button is released:
                 document.onmouseup = null;
                 document.onmousemove = null;
                 
-                // SNAP TO GRID (20px)
+                // SNAP TO 20px GRID
                 let snapTop = Math.round(elmnt.offsetTop / 20) * 20;
                 let snapLeft = Math.round(elmnt.offsetLeft / 20) * 20;
                 elmnt.style.top = snapTop + "px";
@@ -340,17 +353,13 @@
             const widgets = document.querySelectorAll('.widget');
             let positions = {};
             widgets.forEach(w => {
-                positions[w.id] = { 
-                    top: w.style.top, 
-                    left: w.style.left,
-                    // If we moved it, we nullify right/bottom. If it wasn't moved, these might be empty strings, which is fine.
-                };
+                positions[w.id] = { top: w.style.top, left: w.style.left };
             });
-            localStorage.setItem('widget_positions', JSON.stringify(positions));
+            localStorage.setItem('widget_positions_v20', JSON.stringify(positions));
         }
 
         function loadWidgetPositions() {
-            const saved = localStorage.getItem('widget_positions');
+            const saved = localStorage.getItem('widget_positions_v20');
             if(saved) {
                 const positions = JSON.parse(saved);
                 for (const [id, pos] of Object.entries(positions)) {
@@ -366,16 +375,13 @@
         }
 
         function resetLayout() {
-            if(confirm("Reset all widget positions to default?")) {
-                localStorage.removeItem('widget_positions');
+            if(confirm("Reset all widget positions?")) {
+                localStorage.removeItem('widget_positions_v20');
                 location.reload();
             }
         }
 
-        // --- PREVENT CLICKING SETTINGS WHILE DRAGGING ---
-        function handleSettingsClick() {
-            if(!isEditMode) toggleModal();
-        }
+        function handleSettingsClick() { if(!isEditMode) toggleModal(); }
 
         // --- THEME ---
         function updateAccent(color) {
@@ -429,8 +435,7 @@
         function addMsg(role, text) {
             const div = document.createElement('div');
             div.className = `msg ${role}`;
-            let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-            formatted = formatted.replace(/\n/g, '<br>');
+            let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
             div.innerHTML = formatted;
             chatHistory.appendChild(div);
             chatHistory.scrollTop = chatHistory.scrollHeight;
