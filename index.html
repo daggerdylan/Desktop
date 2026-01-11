@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>AI Horde Dashboard (No Key Required)</title>
+    <title>Pollinations Dashboard (Fast AI)</title>
     <style>
         /* --- RESET --- */
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
@@ -75,6 +75,7 @@
         
         .controls-row { display: flex; gap: 10px; }
         input[type="text"], input[type="password"] { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; }
+        textarea { width: 100%; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; resize: none; font-family: inherit; }
         .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
         
         .toggles { display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 0 20px; border-radius: 12px; min-height: 45px; }
@@ -110,12 +111,12 @@
     <div id="ai-container">
         <div id="chat-window">
             <div class="chat-header">
-                <div>AI HORDE <span id="status-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">REMOTE</span></div>
+                <div>POLLINATIONS <span style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">FAST</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
             </div>
             <div id="chat-history"></div>
             <div class="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Chat with Horde..." onkeypress="handleEnter(event)">
+                <input type="text" id="chat-input" placeholder="Message..." onkeypress="handleEnter(event)">
                 <button id="send-btn" onclick="sendMessage()">→</button>
             </div>
         </div>
@@ -125,14 +126,11 @@
         <div id="search-modal">
             <h3 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Configuration</h3>
             
-            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">🤖 AI STATUS</label>
-                <div style="font-size: 0.8rem; margin-top:5px; line-height: 1.4;">
-                    Using <strong>AI Horde</strong> (Crowd-sourced GPUs).<br>
-                    <strong>Cost:</strong> Free.<br>
-                    <strong>Hardware:</strong> None required.<br>
-                    <strong>Key:</strong> "0000000000" (Anonymous).
-                </div>
+            <!-- AI CONFIG -->
+            <div>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">CUSTOM INSTRUCTIONS (Persona)</label>
+                <textarea id="system-instruction" placeholder="e.g. You are a rude robot. You are a helpful assistant..." style="margin-top:5px;" onchange="saveSettings()"></textarea>
+                <div style="font-size:0.75rem; color:#aaa; margin-top:5px;">Powered by Pollinations.ai (No Key Required).</div>
             </div>
 
             <!-- WALLHAVEN -->
@@ -172,26 +170,30 @@
         const bgImage = document.getElementById('bg-image');
         const resultsGrid = document.getElementById('results-grid');
         const chatHistory = document.getElementById('chat-history');
-        const statusDisplay = document.getElementById('status-display');
+        const systemInput = document.getElementById('system-instruction');
 
         // --- INIT ---
         window.onload = () => {
+            const savedSystem = localStorage.getItem('system_instruction');
+            if(savedSystem) systemInput.value = savedSystem;
+            else systemInput.value = "You are a helpful desktop assistant. Keep answers concise.";
+
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("system", "Connected to AI Horde. No API key needed.");
+            else addMsg("system", "Connected to Pollinations AI. Fast & Free.");
 
             updateTime();
             fetchWeather();
         };
 
         // --- LOGIC ---
+        function saveSettings() { localStorage.setItem('system_instruction', systemInput.value); }
         function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
         function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
 
         function addMsg(role, text) {
             const div = document.createElement('div');
             div.className = `msg ${role}`;
-            // Basic Markdown
             let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
             formatted = formatted.replace(/\n/g, '<br>');
             div.innerHTML = formatted;
@@ -200,14 +202,12 @@
             localStorage.setItem('chat_history', chatHistory.innerHTML);
         }
 
-        // --- AI HORDE LOGIC ---
-        // 1. Submit Request -> Get ID
-        // 2. Poll Status -> Wait for Done
-        // 3. Get Result
-
+        // --- POLLINATIONS.AI LOGIC ---
         async function sendMessage() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
+            const system = systemInput.value;
+
             if(!text) return;
 
             addMsg("user", text);
@@ -215,76 +215,41 @@
 
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'msg ai';
-            loadingDiv.innerText = 'Queued...';
+            loadingDiv.innerText = 'Thinking...';
             loadingDiv.id = 'loading-msg';
             chatHistory.appendChild(loadingDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
             try {
-                // Step 1: Submit to Horde
-                const prompt = `### Instruction:\n${text}\n### Response:\n`;
+                // Pollinations provides an OpenAI-compatible endpoint for free
+                const url = "https://text.pollinations.ai/openai";
                 
-                const submitRes = await fetch("https://stablehorde.net/api/v2/generate/text/async", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "apikey": "0000000000", // Anonymous Key
-                        "Client-Agent": "WallpaperDashboard:v1:Anon"
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
                     },
+                    referrerPolicy: 'no-referrer', // Helps on Linux
                     body: JSON.stringify({
-                        prompt: prompt,
-                        params: {
-                            n: 1,
-                            max_context_length: 512,
-                            max_length: 150,
-                            temperature: 0.7
-                        },
-                        models: ["koboldcpp/Llama-3-8b-Instruct-Q8_0"] // Popular model
+                        model: 'openai', // This maps to GPT-4o-Mini or similar fast models
+                        messages: [
+                            { role: 'system', content: system },
+                            { role: 'user', content: text }
+                        ]
                     })
                 });
 
-                const submitData = await submitRes.json();
-                const id = submitData.id;
+                const data = await res.json();
                 
-                if(!id) throw new Error(submitData.message || "Failed to join queue");
-
-                // Step 2: Poll for completion
-                let attempts = 0;
-                const pollInterval = setInterval(async () => {
-                    attempts++;
-                    document.getElementById('loading-msg').innerText = `Thinking (${attempts}s)...`;
-                    
-                    try {
-                        const checkRes = await fetch(`https://stablehorde.net/api/v2/generate/text/status/${id}`, {
-                            headers: { "Client-Agent": "WallpaperDashboard:v1:Anon" }
-                        });
-                        const checkData = await checkRes.json();
-
-                        if (checkData.finished === 1) {
-                            clearInterval(pollInterval);
-                            document.getElementById('loading-msg').remove();
-                            // Done!
-                            const finalRes = checkData.generations[0].text;
-                            addMsg("ai", finalRes);
-                        } else if (checkData.fault) {
-                            clearInterval(pollInterval);
-                            throw new Error("Generation Fault");
-                        }
-                        
-                        // Timeout after 60s
-                        if (attempts > 30) {
-                            clearInterval(pollInterval);
-                            throw new Error("Timed out waiting for GPU");
-                        }
-                    } catch(pollErr) {
-                        clearInterval(pollInterval);
-                        if(document.getElementById('loading-msg')) document.getElementById('loading-msg').innerText = "Error polling.";
-                    }
-                }, 2000); // Check every 2s
+                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
+                
+                // Pollinations matches OpenAI structure
+                const reply = data.choices[0].message.content;
+                addMsg("ai", reply);
 
             } catch (e) {
                 if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                addMsg("error", "Horde Error: " + e.message);
+                addMsg("error", "Error: " + e.message);
             }
         }
 
@@ -300,13 +265,18 @@
         async function searchWallhaven() {
             const query = document.getElementById('search-query').value || 'random';
             const purity = getPurity();
+            
             resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
+            
             try {
                 const seed = Math.floor(Math.random() * 999999);
                 const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
+                // Using AllOrigins Proxy
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+                
                 const res = await fetch(proxyUrl);
                 const data = await res.json();
+                
                 resultsGrid.innerHTML = '';
                 if (data.data && data.data.length > 0) {
                     data.data.forEach(imgData => {
@@ -341,7 +311,7 @@
 
         async function fetchWeather() {
             try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`);
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`, { referrerPolicy: 'no-referrer' });
                 const data = await res.json();
                 document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°C`;
             } catch (e) {}
