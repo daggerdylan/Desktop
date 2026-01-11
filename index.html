@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <title>.</title>
+    <title>Dashboard V23 (Ghost Mode)</title>
     <style>
         /* --- VARIABLES --- */
         :root {
             --accent: #87CEEB;
-            --bg-glass: rgba(20, 20, 20, 0.9);
+            --glass-alpha: 0.9; /* Default Opacity */
+            --bg-glass: rgba(20, 20, 20, var(--glass-alpha));
             --border: rgba(255, 255, 255, 0.15);
             --unit: 160px;
             --gap: 20px;
@@ -39,7 +40,7 @@
         }
         body.edit-mode #grid-overlay { opacity: 1; }
 
-        /* --- DONE BUTTON (THE FIX) --- */
+        /* --- DONE BUTTON --- */
         #done-btn {
             position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
             background: var(--accent); color: #000;
@@ -64,7 +65,7 @@
             display: flex; flex-direction: column; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             pointer-events: auto; 
-            transition: border-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            transition: border-color 0.2s, transform 0.1s, box-shadow 0.2s, background 0.3s;
             min-width: var(--unit); min-height: var(--unit);
         }
 
@@ -123,6 +124,7 @@
         textarea { width: 100%; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; resize: none; font-family: inherit; }
         .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
         input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: transparent; }
+        input[type="range"] { accent-color: var(--accent); flex-grow: 1; cursor: pointer; }
         .toggles { display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 0 20px; border-radius: 12px; min-height: 45px; }
         input[type="checkbox"] { accent-color: var(--accent); transform: scale(1.1); }
         #results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; overflow-y: auto; height: 200px; }
@@ -207,16 +209,24 @@
                 <button class="btn" style="background: rgba(255,255,255,0.1); font-size:0.8rem;" onclick="resetLayout()">Reset All Widgets</button>
             </div>
 
+            <!-- THEME & OPACITY -->
             <div class="controls-row" style="align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px;">
                 <label style="color:white; font-weight:bold;">ACCENT COLOR</label>
                 <input type="color" id="accent-picker" value="#87CEEB" onchange="updateAccent(this.value)">
             </div>
 
+            <div class="controls-row" style="align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px;">
+                <label style="color:white; font-weight:bold;">WIDGET OPACITY</label>
+                <input type="range" id="opacity-slider" min="0.1" max="1" step="0.05" value="0.9" oninput="updateOpacity(this.value)">
+            </div>
+
+            <!-- AI CONFIG -->
             <div>
                 <label style="color:var(--accent); font-size:0.8rem; font-weight:bold;">AI INSTRUCTIONS</label>
                 <textarea id="system-instruction" placeholder="e.g. You are a helpful assistant..." style="margin-top:5px;" onchange="saveSettings()"></textarea>
             </div>
 
+            <!-- WALLHAVEN -->
             <div>
                 <label style="color:var(--accent); font-size:0.8rem; font-weight:bold;">WALLPAPER SEARCH</label>
                 <div class="controls-row" style="margin-top:5px;">
@@ -231,6 +241,7 @@
                 <div id="results-grid"></div>
             </div>
 
+            <!-- LOCAL FILE -->
             <div>
                 <label style="color:var(--accent); font-size:0.8rem; font-weight:bold;">LOCAL FILE</label>
                 <input type="file" id="local-file" accept="image/*" onchange="handleLocalFile(this)" style="width: 100%; margin-top:5px;">
@@ -252,6 +263,7 @@
         const systemInput = document.getElementById('system-instruction');
         const todoList = document.getElementById('todo-list');
         const accentPicker = document.getElementById('accent-picker');
+        const opacitySlider = document.getElementById('opacity-slider');
         const editCheck = document.getElementById('chk-editmode');
 
         // --- INIT ---
@@ -268,6 +280,9 @@
             const savedAccent = localStorage.getItem('accent_color');
             if(savedAccent) { updateAccent(savedAccent); accentPicker.value = savedAccent; }
 
+            const savedOpacity = localStorage.getItem('widget_opacity');
+            if(savedOpacity) { updateOpacity(savedOpacity); opacitySlider.value = savedOpacity; }
+
             loadTodos();
             updateTime();
             fetchWeather();
@@ -275,45 +290,14 @@
 
         // --- DRAG ENGINE ---
         let isEditMode = false;
-        
         function toggleEditMode(checkbox) {
             isEditMode = checkbox.checked;
-            if(isEditMode) {
-                document.body.classList.add('edit-mode');
-                enableDrag();
-                // Close modal so user can drag immediately
-                document.getElementById('modal-overlay').classList.remove('active');
-            } else {
-                document.body.classList.remove('edit-mode');
-                disableDrag();
-            }
+            if(isEditMode) { document.body.classList.add('edit-mode'); enableDrag(); document.getElementById('modal-overlay').classList.remove('active'); } 
+            else { document.body.classList.remove('edit-mode'); disableDrag(); }
         }
-
-        // New function to handle the top DONE button
-        function exitEditMode() {
-            isEditMode = false;
-            document.body.classList.remove('edit-mode');
-            editCheck.checked = false; // Uncheck the box in settings
-            disableDrag();
-        }
-
-        function enableDrag() {
-            const widgets = document.querySelectorAll('.widget');
-            widgets.forEach(w => {
-                w.onmousedown = dragMouseDown;
-                const resizer = w.querySelector('.resizer');
-                if(resizer) resizer.onmousedown = initResize;
-            });
-        }
-
-        function disableDrag() {
-            const widgets = document.querySelectorAll('.widget');
-            widgets.forEach(w => {
-                w.onmousedown = null;
-                const resizer = w.querySelector('.resizer');
-                if(resizer) resizer.onmousedown = null;
-            });
-        }
+        function exitEditMode() { isEditMode = false; document.body.classList.remove('edit-mode'); editCheck.checked = false; disableDrag(); }
+        function enableDrag() { const widgets = document.querySelectorAll('.widget'); widgets.forEach(w => { w.onmousedown = dragMouseDown; const resizer = w.querySelector('.resizer'); if(resizer) resizer.onmousedown = initResize; }); }
+        function disableDrag() { const widgets = document.querySelectorAll('.widget'); widgets.forEach(w => { w.onmousedown = null; const resizer = w.querySelector('.resizer'); if(resizer) resizer.onmousedown = null; }); }
 
         // --- RESIZING ---
         function initResize(e) {
@@ -323,12 +307,9 @@
             let startX = e.clientX; let startY = e.clientY;
             let startWidth = parseInt(document.defaultView.getComputedStyle(widget).width, 10);
             let startHeight = parseInt(document.defaultView.getComputedStyle(widget).height, 10);
-
             document.onmousemove = (e) => {
-                let newW = startWidth + (e.clientX - startX);
-                let newH = startHeight + (e.clientY - startY);
-                newW = Math.max(160, Math.round(newW / 20) * 20);
-                newH = Math.max(160, Math.round(newH / 20) * 20);
+                let newW = Math.max(160, Math.round((startWidth + (e.clientX - startX)) / 20) * 20);
+                let newH = Math.max(160, Math.round((startHeight + (e.clientY - startY)) / 20) * 20);
                 widget.style.width = newW + 'px'; widget.style.height = newH + 'px';
             };
             document.onmouseup = () => { document.onmousemove = null; document.onmouseup = null; saveWidgetData(); };
@@ -341,20 +322,16 @@
             e.preventDefault();
             let pos3 = e.clientX; let pos4 = e.clientY; let elmnt = this;
             document.onmouseup = closeDragElement; document.onmousemove = elementDrag;
-
             function elementDrag(e) {
                 e.preventDefault();
-                let pos1 = pos3 - e.clientX; let pos2 = pos4 - e.clientY;
-                pos3 = e.clientX; pos4 = e.clientY;
-                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+                let pos1 = pos3 - e.clientX; let pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY;
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px"; elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
                 elmnt.style.right = 'auto'; elmnt.style.bottom = 'auto';
             }
             function closeDragElement() {
                 document.onmouseup = null; document.onmousemove = null;
-                let snapTop = Math.round(elmnt.offsetTop / 20) * 20;
-                let snapLeft = Math.round(elmnt.offsetLeft / 20) * 20;
-                elmnt.style.top = snapTop + "px"; elmnt.style.left = snapLeft + "px";
+                elmnt.style.top = (Math.round(elmnt.offsetTop / 20) * 20) + "px";
+                elmnt.style.left = (Math.round(elmnt.offsetLeft / 20) * 20) + "px";
                 saveWidgetData();
             }
         }
@@ -362,12 +339,9 @@
         function saveWidgetData() {
             const widgets = document.querySelectorAll('.widget');
             let data = {};
-            widgets.forEach(w => {
-                data[w.id] = { top: w.style.top, left: w.style.left, width: w.style.width, height: w.style.height };
-            });
+            widgets.forEach(w => { data[w.id] = { top: w.style.top, left: w.style.left, width: w.style.width, height: w.style.height }; });
             localStorage.setItem('widget_data_v22', JSON.stringify(data));
         }
-
         function loadWidgetData() {
             const saved = localStorage.getItem('widget_data_v22');
             if(saved) {
@@ -383,10 +357,13 @@
                 }
             }
         }
-
         function resetLayout() { if(confirm("Reset layout?")) { localStorage.removeItem('widget_data_v22'); location.reload(); } }
+        function handleSettingsClick() { if(!isEditMode) toggleModal(); }
         function toggleModal() { document.getElementById('modal-overlay').classList.toggle('active'); }
+        
+        // --- APPEARANCE ---
         function updateAccent(color) { document.documentElement.style.setProperty('--accent', color); localStorage.setItem('accent_color', color); }
+        function updateOpacity(val) { document.documentElement.style.setProperty('--glass-alpha', val); localStorage.setItem('widget_opacity', val); }
 
         // --- TO-DO ---
         function handleTodoEnter(e) { if(e.key === 'Enter' && e.target.value.trim() !== "") { addTodo(e.target.value.trim()); e.target.value = ""; } }
@@ -400,10 +377,7 @@
         function saveSettings() { localStorage.setItem('system_instruction', systemInput.value); }
         function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
         function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
-        function addMsg(role, text) {
-            const div = document.createElement('div'); div.className = `msg ${role}`; div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-            chatHistory.appendChild(div); chatHistory.scrollTop = chatHistory.scrollHeight; localStorage.setItem('chat_history', chatHistory.innerHTML);
-        }
+        function addMsg(role, text) { const div = document.createElement('div'); div.className = `msg ${role}`; div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); chatHistory.appendChild(div); chatHistory.scrollTop = chatHistory.scrollHeight; localStorage.setItem('chat_history', chatHistory.innerHTML); }
         async function sendMessage() {
             const input = document.getElementById('chat-input'); const text = input.value.trim(); const system = systemInput.value || "Helpful assistant";
             if(!text) return; addMsg("user", text); input.value = '';
