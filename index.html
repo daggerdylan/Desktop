@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Gemini Dashboard V11 (Fail-Safe)</title>
+    <meta name="referrer" content="no-referrer">
+    <title>Gemini Dashboard V12 (Stable)</title>
     <style>
         /* --- RESET --- */
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
@@ -10,11 +11,11 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
-        body {
-            width: 100vw; height: 100vh;
-            overflow: hidden;
-            font-family: "Noto Sans", "DejaVu Sans", sans-serif;
-            background: #111;
+        body { 
+            width: 100vw; height: 100vh; 
+            overflow: hidden; 
+            font-family: "Noto Sans", "DejaVu Sans", sans-serif; 
+            background: #111; 
             color: white;
             user-select: none;
         }
@@ -26,7 +27,7 @@
         #widget-container { position: absolute; top: 50%; right: 40px; transform: translateY(-50%); width: 350px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; z-index: 10; }
         #ai-container { position: absolute; bottom: 40px; left: 40px; width: 400px; height: 550px; z-index: 10; }
 
-        /* --- CHAT/NOTES --- */
+        /* --- CHAT --- */
         #chat-window {
             width: 100%; height: 100%;
             background: rgba(20, 20, 20, 0.9);
@@ -44,17 +45,13 @@
             background: rgba(255,255,255,0.03);
         }
 
-        /* Status Badge */
-        #status-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; font-weight: bold; }
-        .status-online { background: #51cf66; color: #000; }
-        .status-offline { background: #ff6b6b; color: #fff; }
-
         #chat-history { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-
+        
         .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; word-wrap: break-word; }
         .msg.user { align-self: flex-end; background: #87CEEB; color: #111; font-weight: 600; }
         .msg.ai { align-self: flex-start; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); }
-        .msg.note { width: 100%; max-width: 100%; background: rgba(255,255,100,0.1); border-left: 3px solid #ffd43b; border-radius: 4px; color: #fff; font-family: monospace; }
+        .msg.error { align-self: center; background: rgba(255, 80, 80, 0.2); border: 1px solid #ff4444; color: #ffcccc; font-family: monospace; font-size: 0.8rem; }
+        .msg.system { align-self: center; color: #aaa; font-size: 0.75rem; font-style: italic; }
 
         .chat-input-area { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
         #chat-input { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 15px; color: white; }
@@ -75,10 +72,16 @@
         #modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
         #modal-overlay.active { opacity: 1; pointer-events: all; }
         #search-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; max-height: 90vh; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 30px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
-
+        
         .controls-row { display: flex; gap: 10px; }
         input[type="text"], input[type="password"] { flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 12px; color: white; }
         .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; background: white; color: black; }
+        
+        /* RESTORED TOGGLES */
+        .toggles { display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.3); padding: 0 20px; border-radius: 12px; min-height: 45px; }
+        .toggle-label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+        input[type="checkbox"] { accent-color: #fd5e53; transform: scale(1.1); }
+
         #results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; overflow-y: auto; height: 200px; }
         .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
         .thumb:hover { border-color: #87CEEB; }
@@ -108,95 +111,88 @@
     <div id="ai-container">
         <div id="chat-window">
             <div class="chat-header">
-                <div>ASSISTANT <span id="status-badge" class="status-offline">CHECKING...</span></div>
+                <div>GEMINI <span id="model-display" style="font-size:0.7em; background:#444; padding:2px 6px; border-radius:4px;">AUTO</span></div>
                 <div style="font-size: 0.75rem; opacity: 0.6; cursor: pointer;" onclick="clearChat()">🗑️ Clear</div>
             </div>
             <div id="chat-history"></div>
             <div class="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Type here..." onkeypress="handleEnter(event)">
-                <button id="send-btn" onclick="handleInput()">→</button>
+                <input type="text" id="chat-input" placeholder="Message..." onkeypress="handleEnter(event)">
+                <button id="send-btn" onclick="sendMessage()">→</button>
             </div>
         </div>
     </div>
 
     <div id="modal-overlay" onclick="if(event.target === this) toggleModal()">
         <div id="search-modal">
-            <h3>Configuration</h3>
+            <h3 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Configuration</h3>
+            
+            <!-- API KEY -->
             <div>
                 <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">GEMINI API KEY</label>
                 <input type="password" id="gemini-key" placeholder="Paste Key..." style="width: 100%; margin-top:5px;" onchange="saveSettings()">
+                <div style="font-size:0.75rem; color:#aaa; margin-top:5px;">Your key is saved locally. If "1.5 Flash" fails, I will auto-switch to "Pro".</div>
             </div>
+
+            <!-- WALLHAVEN -->
             <div>
                 <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">WALLHAVEN SEARCH</label>
                 <div class="controls-row" style="margin-top:5px;">
-                    <input type="text" id="search-query" placeholder="Tag" value="scenery">
+                    <input type="text" id="search-query" placeholder="Tag (e.g. Cyberpunk)" value="scenery">
                     <button class="btn" onclick="searchWallhaven()">Search</button>
                 </div>
+                
+                <!-- RESTORED TOGGLES -->
+                <div class="toggles" style="margin-top: 10px;">
+                    <label class="toggle-label"><input type="checkbox" id="chk-sfw" checked> SFW</label>
+                    <label class="toggle-label" style="color: #ffd700;"><input type="checkbox" id="chk-sketchy"> Sketchy</label>
+                    <label class="toggle-label" style="color: #ff4444;"><input type="checkbox" id="chk-nsfw"> NSFW</label>
+                </div>
+
                 <div id="results-grid"></div>
             </div>
+
+            <!-- LOCAL FILE -->
             <div>
-                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">LOCAL FILE (Best for Offline)</label>
+                <label style="color:#87CEEB; font-size:0.8rem; font-weight:bold;">LOCAL FILE (Offline)</label>
                 <input type="file" id="local-file" accept="image/*" onchange="handleLocalFile(this)" style="width: 100%; margin-top:5px;">
             </div>
+            
             <button class="btn" style="width: 100%; background: #333; color: white; margin-top: 10px;" onclick="toggleModal()">Close</button>
         </div>
     </div>
 
     <script>
         // --- CONFIG ---
-        const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9';
-        const LAT = 40.7128;
-        const LON = -74.0060;
+        // DO NOT PASTE KEYS HERE FOR GITHUB UPLOAD. LEAVE EMPTY.
+        const WALLHAVEN_KEY = 'xTI3zpzyCOeH4ezFz0w30iQmosKjHJV9'; 
+        const LAT = 40.7128; 
+        const LON = -74.0060; 
         const DEFAULT_GEMINI_KEY = 'AIzaSyDgp2jqTk9TxsQCKwU4BafNctQ0n2BAgnQ';
-
-        // --- STATE ---
-        let isOnline = false;
 
         // --- DOM ---
         const bgImage = document.getElementById('bg-image');
         const resultsGrid = document.getElementById('results-grid');
         const chatHistory = document.getElementById('chat-history');
         const keyInput = document.getElementById('gemini-key');
-        const statusBadge = document.getElementById('status-badge');
-        const chatInput = document.getElementById('chat-input');
+        const modelDisplay = document.getElementById('model-display');
 
         // --- INIT ---
         window.onload = () => {
             const savedKey = localStorage.getItem('gemini_key');
             keyInput.value = savedKey || DEFAULT_GEMINI_KEY;
-
+            
             const savedChat = localStorage.getItem('chat_history');
             if(savedChat) chatHistory.innerHTML = savedChat;
-            else addMsg("ai", "Initializing...");
+            else addMsg("system", "System Online.");
 
-            checkConnectivity();
             updateTime();
             fetchWeather();
         };
 
-        // --- CORE LOGIC ---
-
-        async function checkConnectivity() {
-            try {
-                // Try a harmless fetch to Google Fonts to test internet
-                await fetch("https://fonts.googleapis.com/css?family=Roboto", { mode: 'no-cors' });
-                isOnline = true;
-                statusBadge.innerText = "ONLINE (AI)";
-                statusBadge.className = "status-online";
-                chatInput.placeholder = "Message Gemini...";
-                addMsg("ai", "Network detected. AI systems active.");
-            } catch (e) {
-                isOnline = false;
-                statusBadge.innerText = "OFFLINE (NOTES)";
-                statusBadge.className = "status-offline";
-                chatInput.placeholder = "Save a local note...";
-                addMsg("ai", "Network Blocked. Switched to **Local Notepad Mode**. Messages will be saved locally.");
-            }
-        }
-
+        // --- GEMINI LOGIC (With Auto-Fallback) ---
         function saveSettings() { localStorage.setItem('gemini_key', keyInput.value); }
         function clearChat() { chatHistory.innerHTML = ''; localStorage.removeItem('chat_history'); }
-        function handleEnter(e) { if(e.key === 'Enter') handleInput(); }
+        function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
 
         function addMsg(role, text) {
             const div = document.createElement('div');
@@ -207,23 +203,14 @@
             localStorage.setItem('chat_history', chatHistory.innerHTML);
         }
 
-        function handleInput() {
-            const text = chatInput.value.trim();
-            if(!text) return;
-            chatInput.value = '';
-
-            if (isOnline) {
-                // Online: Send to AI
-                sendMessageToAI(text);
-            } else {
-                // Offline: Save as Note
-                addMsg("note", `> ${text}`);
-            }
-        }
-
-        async function sendMessageToAI(text) {
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
             const apiKey = keyInput.value || DEFAULT_GEMINI_KEY;
+
+            if(!text) return;
             addMsg("user", text);
+            input.value = '';
 
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'msg ai';
@@ -232,54 +219,73 @@
             chatHistory.appendChild(loadingDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
+            // TRY MODEL 1: FLASH
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-                const payload = { contents: [{ role: "user", parts: [{ text: text }] }] };
-
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    referrerPolicy: 'no-referrer',
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                document.getElementById('loading-msg').remove();
-
-                if(data.error) {
-                    addMsg("error", `API Error: ${data.error.message}`);
-                } else {
-                    addMsg("ai", data.candidates[0].content.parts[0].text);
-                }
+                await callGemini("gemini-1.5-flash", apiKey, text);
             } catch (e) {
-                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
-                addMsg("error", "Request failed. Switching to Offline Mode.");
-                isOnline = false;
-                statusBadge.innerText = "OFFLINE (NOTES)";
-                statusBadge.className = "status-offline";
+                console.warn("Flash failed, trying Pro...");
+                // TRY MODEL 2: PRO (Fallback)
+                try {
+                    await callGemini("gemini-pro", apiKey, text);
+                } catch (e2) {
+                    if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
+                    addMsg("error", "Failed. Check Internet or API Key.");
+                }
             }
         }
 
-        // --- WALLHAVEN ---
+        async function callGemini(model, key, prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                referrerPolicy: 'no-referrer',
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            
+            if(data.error) {
+                // Throw error so the Catch block above triggers the fallback
+                throw new Error(data.error.message);
+            } else {
+                if(document.getElementById('loading-msg')) document.getElementById('loading-msg').remove();
+                addMsg("ai", data.candidates[0].content.parts[0].text);
+                
+                // Update Badge to show which model actually worked
+                modelDisplay.innerText = model.toUpperCase().replace("GEMINI-", "");
+            }
+        }
+
+        // --- WALLHAVEN LOGIC (With Proxy & Toggles) ---
         function toggleModal() { document.getElementById('modal-overlay').classList.toggle('active'); }
 
-        async function searchWallhaven() {
-            if(!isOnline) {
-                alert("Cannot search Wallhaven: Offline Mode Active.");
-                return;
-            }
-            const query = document.getElementById('search-query').value || 'random';
-            resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
+        function getPurity() {
+            const sfw = document.getElementById('chk-sfw').checked ? '1' : '0';
+            const sketchy = document.getElementById('chk-sketchy').checked ? '1' : '0';
+            const nsfw = document.getElementById('chk-nsfw').checked ? '1' : '0';
+            // Default to SFW if user is dumb and unchecks everything
+            return (sfw+sketchy+nsfw === '000') ? '100' : (sfw+sketchy+nsfw);
+        }
 
+        async function searchWallhaven() {
+            const query = document.getElementById('search-query').value || 'random';
+            const purity = getPurity();
+            
+            resultsGrid.innerHTML = '<div style="color:white; text-align:center;">Searching...</div>';
+            
             try {
                 const seed = Math.floor(Math.random() * 999999);
-                // Using AllOrigins Proxy as primary for Linux
-                const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=100&sorting=random&seed=${seed}&page=1`;
+                const targetUrl = `https://wallhaven.cc/api/v1/search?apikey=${WALLHAVEN_KEY}&q=${query}&purity=${purity}&sorting=random&seed=${seed}&page=1`;
+                
+                // Using AllOrigins Proxy (Works best for Linux)
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-
+                
                 const res = await fetch(proxyUrl);
                 const data = await res.json();
-
+                
                 resultsGrid.innerHTML = '';
                 if (data.data && data.data.length > 0) {
                     data.data.forEach(imgData => {
@@ -293,7 +299,7 @@
                     resultsGrid.innerHTML = 'No results found.';
                 }
             } catch (e) {
-                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Blocked.</div>`;
+                resultsGrid.innerHTML = `<div style="color:#ff6b6b; text-align:center;">Network Blocked.<br><small>If on Linux, verify plugin network settings.</small></div>`;
             }
         }
 
@@ -317,7 +323,7 @@
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true`, { referrerPolicy: 'no-referrer' });
                 const data = await res.json();
                 document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°C`;
-                document.getElementById('condition').innerText = "Active";
+                document.getElementById('condition').innerText = "Active"; 
             } catch (e) { console.log("Weather failed"); }
         }
     </script>
